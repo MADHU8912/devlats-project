@@ -1,0 +1,62 @@
+pipeline {
+    agent any
+
+    triggers {
+        cron('H/15 * * * *')
+    }
+
+    stages {
+        stage('Checkout SCM') {
+            steps {
+                git branch: 'main', url: 'https://github.com/YOUR_USERNAME/devlats-project.git'
+            }
+        }
+
+        stage('Check Files') {
+            steps {
+                bat 'dir'
+                bat 'cd website && dir'
+                bat 'cd dashboard && dir'
+            }
+        }
+
+        stage('Build Docker Image') {
+            steps {
+                bat 'cd dashboard && docker build -t devlats-dashboard .'
+            }
+        }
+
+        stage('Remove Old Container') {
+            steps {
+                bat 'docker rm -f devlats-dashboard-container || exit /b 0'
+            }
+        }
+
+        stage('Run New Container') {
+            steps {
+                bat 'docker run -d -p 8080:80 --name devlats-dashboard-container devlats-dashboard'
+            }
+        }
+
+        stage('Build Log') {
+            steps {
+                bat 'echo Devlats pipeline completed successfully > build-log.txt'
+            }
+        }
+
+        stage('Archive Logs') {
+            steps {
+                archiveArtifacts artifacts: 'build-log.txt', fingerprint: true
+            }
+        }
+    }
+
+    post {
+        success {
+            echo 'Pipeline completed successfully'
+        }
+        failure {
+            echo 'Pipeline failed'
+        }
+    }
+}
